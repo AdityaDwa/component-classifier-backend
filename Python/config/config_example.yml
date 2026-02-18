@@ -1,0 +1,12 @@
+CORS:
+    allowed_origins :
+
+PREPROCESSING:
+  ALLOWED_PREFIX :
+  REMOVE_SUFFIX :
+
+CRON_EMAIL:
+    from :
+    to :
+    error_to :
+    report_to :

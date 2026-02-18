@@ -1,0 +1,10 @@
+logs
+data
+*.log
+*.log.*
+.idea
+.vscode
+.DS_Store
+config.yml
+__pycache__
+Pipfile.lock
