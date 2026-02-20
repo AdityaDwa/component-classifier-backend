@@ -1,9 +1,11 @@
+txt
 logs
 data
 *.log
 *.log.*
 .idea
 .vscode
+datasets
 .DS_Store
 config.yml
 __pycache__

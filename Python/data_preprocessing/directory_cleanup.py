@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 from utils.logger_utils import Logger
@@ -57,7 +58,7 @@ class DirectoryCleanup:
         """
         self.logger.info(f"inside load_and_preprocess method..........")
         total_file: int = 0
-        raw_data_path = PathUtils().get_raw_data_path()
+        raw_data_path: Path = PathUtils().get_raw_data_path()
         for folder in raw_data_path.iterdir():
             if folder.is_dir():
                 self.logger.info(f"Processing folder: {folder}")
@@ -79,18 +80,36 @@ class DirectoryCleanup:
             None: This function does not return a value. It performs validation and folder deletion as side effects.
         """
         self.logger.info(f"inside count_files_in_folder method..........")
-        raw_data_path = PathUtils().get_raw_data_path()
+        raw_data_path: Path = PathUtils().get_raw_data_path()
         for folder in raw_data_path.iterdir():
             if folder.is_dir():
-                total_files = sum(1 for item in folder.iterdir() if item.is_file())
+                total_files: int = sum(1 for item in folder.iterdir() if item.is_file())
+                self.logger.info(f"Processing folder: {folder}, total files: {total_files}")
                 if total_files == FILE_COUNT:
-                    return
+                    continue
                 else:
-                    folder.unlink()
+                    file_path: Path = PathUtils().get_txt_path().joinpath("deleted_folder.txt")
+                    with open(file_path, "a", encoding="utf-8") as f:
+                        f.write(f"{folder.name}\n")
+                    shutil.rmtree(folder)
                     self.logger.info(f"Folder deleted due to less files: {folder}")
+
+    def directory_cleanup_main(self) -> None:
+        """
+        Main method for cleaning up and processing the directory. Logs entry into the method, loads and preprocesses
+        the data, and counts the files in the target folder.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        self.logger.info(f"inside directory_cleanup_main method..........")
+        self.load_and_preprocess()
+        self.count_files_in_folder()
 
 
 if __name__ == "__main__":
     dir_cleanup = DirectoryCleanup()
-    dir_cleanup.load_and_preprocess()
-    dir_cleanup.count_files_in_folder()
+    dir_cleanup.directory_cleanup_main()

@@ -52,3 +52,27 @@ class PathUtils:
             Path: Absolute path to the raw data directory.
         """
         return self.__base_path.joinpath("data/raw_data")
+
+    def get_txt_path(self) -> Path:
+        """
+        Returns the absolute path of the txt folder.
+
+        Args:
+            None
+
+        Returns:
+            Path: Absolute path to the txt directory.
+        """
+        return self.__base_path.joinpath("txt")
+
+    def get_image_dataset_path(self) -> Path:
+        """
+        Returns the absolute path of the image dataset folder.
+
+        Args:
+            None
+
+        Returns:
+            Path: Absolute path to the image dataset directory.
+        """
+        return self.__base_path.joinpath("datasets/images")
