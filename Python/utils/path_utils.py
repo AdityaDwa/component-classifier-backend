@@ -76,3 +76,15 @@ class PathUtils:
             Path: Absolute path to the image dataset directory.
         """
         return self.__base_path.joinpath("datasets/images")
+
+    def get_label_dataset_path(self, file_name) -> Path:
+        """
+        Returns the absolute path of the label dataset file.
+
+        Args:
+            file_name (str): Name of the label file.
+
+        Returns:
+            Path: Absolute path to the label dataset file.
+        """
+        return self.__base_path.joinpath("datasets", "labels", file_name)
