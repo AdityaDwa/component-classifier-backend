@@ -4,8 +4,8 @@ from pathlib import Path
 from utils.logger_utils import Logger
 from utils.path_utils import PathUtils
 from utils.generic_utils import remove_file
+from constants.json_constants import label_to_id_dict, role_to_label_dict
 from constants.constants import AXTREE_SUFFIX, BB_SUFFIX, VIEWPORT_SUFFIX
-from constants.json_constants import node_dict, label_to_id_dict, role_to_label_dict
 
 
 class JsonProcessor:
