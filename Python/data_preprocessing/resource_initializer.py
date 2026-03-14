@@ -79,7 +79,7 @@ class ResourceInitializer:
                             with gzip.open(file, "rb") as file_in:
                                 with open(output_file, "wb") as file_out:
                                     shutil.copyfileobj(file_in, file_out)
-                            self.logger.info(f"Extracted {file} → {output_file}")
+                            self.logger.info(f"Extracted {file} -> {output_file}")
                             remove_file(file)
                             self.logger.info(f"File: {file} removed")
                     except Exception as e:

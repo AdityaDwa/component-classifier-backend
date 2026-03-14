@@ -66,6 +66,8 @@ class DirectoryCleanup:
                     if file.is_file():
                         self.remove_unwanted_files(file)
                         total_file += 1
+                    if file.is_dir():
+                        shutil.rmtree(file)
             self.logger.info(f"Removed unwanted files from: {folder}")
         self.logger.info(f"Total files processed: {total_file}")
 

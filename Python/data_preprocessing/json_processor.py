@@ -190,6 +190,10 @@ class JsonProcessor:
             if counter == 0:
                 self.logger.info(f"No data was written to {file_path}")
                 remove_file(file_path)
+                image_dataset_path = PathUtils().get_image_dataset_path()
+                for image_file in image_dataset_path.iterdir():
+                    if image_file.stem == file_name:
+                        remove_file(image_file)
         except Exception as e:
             self.logger.exception(f"Error while writing data to file {file_name}: {e}")
 
@@ -219,39 +223,40 @@ class JsonProcessor:
             if folder.is_dir():
                 self.logger.info(f"Processing folder: {folder}")
                 for file in folder.iterdir():
-                    if file.is_file():
-                        if file.name.endswith(VIEWPORT_SUFFIX):
-                            self.logger.info(f"Processing file: {file}")
-                            viewport_list: list = self.get_viewport_list(file)
+                    if file.is_file() and file.name.endswith(VIEWPORT_SUFFIX):
+                        self.logger.info(f"Processing file: {file}")
+                        viewport_list: list = self.get_viewport_list(file)
 
-                        elif file.name.endswith(AXTREE_SUFFIX):
-                            self.logger.info(f"Processing file: {file}")
-                            axtree_dict: dict = self.get_ax_tree_dict(file)
-                            filtered_axtree_dict: dict = self.clean_ax_tree_dict(axtree_dict)
-                            ids_set = {int(x) for x in viewport_list}
-                            final_axtree_data = {
-                                k: v for k, v in filtered_axtree_dict.items() if k in ids_set
+                for file in folder.iterdir():
+                    if file.is_file() and file.name.endswith(AXTREE_SUFFIX):
+                        self.logger.info(f"Processing file: {file}")
+                        axtree_dict: dict = self.get_ax_tree_dict(file)
+                        filtered_axtree_dict: dict = self.clean_ax_tree_dict(axtree_dict)
+                        ids_set = {int(x) for x in viewport_list}
+                        final_axtree_data = {
+                            k: v for k, v in filtered_axtree_dict.items() if k in ids_set
+                        }
+                        cleaned_axtree_data = {
+                            k: {
+                                "role_value": role_to_label_dict.get(
+                                    v["role_value"], v["role_value"]
+                                )
                             }
-                            cleaned_axtree_data = {
-                                k: {
-                                    "role_value": role_to_label_dict.get(
-                                        v["role_value"], v["role_value"]
-                                    )
-                                }
-                                for k, v in final_axtree_data.items()
-                                if v["role_value"] in role_to_label_dict
-                            }
-                            added_label_id = {
-                                k: {**v, "label_id": label_to_id_dict.get(v["role_value"])}
-                                for k, v in cleaned_axtree_data.items()
-                            }
-                            self.logger.info(f"Cleaned axtree data: {added_label_id}")
+                            for k, v in final_axtree_data.items()
+                            if v["role_value"] in role_to_label_dict
+                        }
+                        added_label_id = {
+                            k: {**v, "label_id": label_to_id_dict.get(v["role_value"])}
+                            for k, v in cleaned_axtree_data.items()
+                        }
+                        self.logger.info(f"Cleaned axtree data: {added_label_id}")
 
-                        elif file.is_file() and file.name.endswith(BB_SUFFIX):
-                            self.logger.info(f"Processing file: {file}")
-                            bb_data_added = self.add_bb_data_to_dict(file, added_label_id)
-                            processed_data = self.process_data_as_needed(bb_data_added)
-                            self.write_data_to_file(folder.name, processed_data)
+                for file in folder.iterdir():
+                    if file.is_file() and file.name.endswith(BB_SUFFIX):
+                        self.logger.info(f"Processing file: {file}")
+                        bb_data_added = self.add_bb_data_to_dict(file, added_label_id)
+                        processed_data = self.process_data_as_needed(bb_data_added)
+                        self.write_data_to_file(folder.name, processed_data)
 
 
 if __name__ == "__main__":
