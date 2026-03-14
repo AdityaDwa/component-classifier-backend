@@ -111,7 +111,7 @@ class JsonProcessor:
                 content: str = file.read()
             file_content: dict = json.loads(content)
             for key in list(axtree_dict.keys()):
-                str_key = str(key)
+                str_key: str = str(key)
                 if str_key in file_content and file_content[str_key] is not None:
                     axtree_dict[key].update(file_content[str_key])
 
@@ -177,8 +177,8 @@ class JsonProcessor:
         """
         self.logger.info(f"inside write_data_to_file method..........")
         try:
-            file_name = file_name + ".txt"
-            file_path = PathUtils().get_label_dataset_path(file_name)
+            txt_file_name: str = file_name + ".txt"
+            file_path: Path = PathUtils().get_label_dataset_path(txt_file_name)
             counter: int = 0
             with open(file_path, "w") as f:
                 for key in ax_tree_dict:
@@ -190,14 +190,14 @@ class JsonProcessor:
             if counter == 0:
                 self.logger.info(f"No data was written to {file_path}")
                 remove_file(file_path)
-                image_dataset_path = PathUtils().get_image_dataset_path()
+                image_dataset_path: Path = PathUtils().get_image_dataset_path()
                 for image_file in image_dataset_path.iterdir():
                     if image_file.stem == file_name:
                         remove_file(image_file)
         except Exception as e:
             self.logger.exception(f"Error while writing data to file {file_name}: {e}")
 
-    def process_json_to_txt(self):
+    def process_json_to_txt(self) -> None:
         """
         Processes raw JSON files in the dataset directory and converts them into structured TXT files.
 
@@ -236,7 +236,7 @@ class JsonProcessor:
                         final_axtree_data = {
                             k: v for k, v in filtered_axtree_dict.items() if k in ids_set
                         }
-                        cleaned_axtree_data = {
+                        cleaned_axtree_data: dict = {
                             k: {
                                 "role_value": role_to_label_dict.get(
                                     v["role_value"], v["role_value"]
@@ -245,7 +245,7 @@ class JsonProcessor:
                             for k, v in final_axtree_data.items()
                             if v["role_value"] in role_to_label_dict
                         }
-                        added_label_id = {
+                        added_label_id: dict = {
                             k: {**v, "label_id": label_to_id_dict.get(v["role_value"])}
                             for k, v in cleaned_axtree_data.items()
                         }
@@ -254,8 +254,8 @@ class JsonProcessor:
                 for file in folder.iterdir():
                     if file.is_file() and file.name.endswith(BB_SUFFIX):
                         self.logger.info(f"Processing file: {file}")
-                        bb_data_added = self.add_bb_data_to_dict(file, added_label_id)
-                        processed_data = self.process_data_as_needed(bb_data_added)
+                        bb_data_added: dict = self.add_bb_data_to_dict(file, added_label_id)
+                        processed_data: dict = self.process_data_as_needed(bb_data_added)
                         self.write_data_to_file(folder.name, processed_data)
 
 

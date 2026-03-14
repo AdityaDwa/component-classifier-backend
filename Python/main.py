@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from utils.logger_utils import Logger
+from data_preprocessing.json_processor import JsonProcessor
 from data_preprocessing.directory_cleanup import DirectoryCleanup
 from data_preprocessing.resource_initializer import ResourceInitializer
 
@@ -12,8 +13,8 @@ class DataPreprocessor:
 
     def main(self) -> None:
         """
-        Main method for processing raw data. Executes directory cleanup and resource initialization, and logs the
-        total elapsed time. Handles any exceptions during processing.
+        Main method for processing raw data. Executes directory cleanup, resource initialization, process json to txt
+        and logs the total elapsed time. Handles any exceptions during processing.
 
         Args:
             None
@@ -26,6 +27,7 @@ class DataPreprocessor:
         try:
             DirectoryCleanup().directory_cleanup_main()
             ResourceInitializer().resource_initializer_main()
+            JsonProcessor().process_json_to_txt()
         except Exception as e:
             self.logger.exception(f"An error occurred during main processing: {e}")
         end_time = datetime.now(timezone.utc)
