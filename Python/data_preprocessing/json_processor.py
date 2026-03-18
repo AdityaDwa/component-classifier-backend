@@ -114,6 +114,9 @@ class JsonProcessor:
                 str_key: str = str(key)
                 if str_key in file_content and file_content[str_key] is not None:
                     axtree_dict[key].update(file_content[str_key])
+                else:
+                    self.logger.warning(f"Node {key} missing bounding box data, removing")
+                    del axtree_dict[key]
 
         except Exception as e:
             self.logger.exception(f"Error while adding bounding box data from {file_path}: {e}")
@@ -177,6 +180,19 @@ class JsonProcessor:
         """
         self.logger.info(f"inside write_data_to_file method..........")
         try:
+            image_dataset_path: Path = PathUtils().get_image_dataset_path()
+
+            image_exists = False
+            for ext in [".webp", ".jpg", ".jpeg", ".png"]:
+                potential_image = image_dataset_path.joinpath(f"{file_name}{ext}")
+                if potential_image.exists():
+                    image_exists = True
+                    break
+            
+            if not image_exists:
+                self.logger.warning(f"Image missing for {file_name}, skipping label creation")
+                return
+
             txt_file_name: str = file_name + ".txt"
             file_path: Path = PathUtils().get_label_dataset_path(txt_file_name)
             counter: int = 0
@@ -190,10 +206,12 @@ class JsonProcessor:
             if counter == 0:
                 self.logger.info(f"No data was written to {file_path}")
                 remove_file(file_path)
-                image_dataset_path: Path = PathUtils().get_image_dataset_path()
-                for image_file in image_dataset_path.iterdir():
-                    if image_file.stem == file_name:
-                        remove_file(image_file)
+
+                for ext in [".webp", ".jpg", ".jpeg", ".png"]:
+                    potential_image = PathUtils().get_image_dataset_path().joinpath(f"{file_name}{ext}")
+                    if potential_image.exists():
+                        remove_file(potential_image)
+                        break
         except Exception as e:
             self.logger.exception(f"Error while writing data to file {file_name}: {e}")
 
