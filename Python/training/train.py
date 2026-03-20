@@ -5,7 +5,7 @@ from ultralytics import YOLO
 
 from utils.logger_utils import Logger
 from utils.path_utils import PathUtils
-from training.config import TRAINING_CONFIG, CLASS_WEIGHTS
+from training.config import TRAINING_CONFIG
 from training.yaml_generator import YAMLGenerator
 
 
@@ -47,6 +47,8 @@ class ModelTrainer:
         # Initialize YOLO model
         model = YOLO(self.config["model"])
         self.logger.info(f"Loaded model: {self.config['model']}")
+
+        project_path = PathUtils().get_base_path().joinpath(self.config["project"])
         
         # Train with class weights for imbalance
         results = model.train(
@@ -57,7 +59,7 @@ class ModelTrainer:
             patience=self.config["patience"],
             device=self.config["device"],
             workers=self.config["workers"],
-            project=self.config["project"],
+            project=str(project_path),
             name=self.config["name"],
             verbose=True,
         )

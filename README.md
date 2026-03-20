@@ -7,7 +7,7 @@ Machine learning pipeline for detecting UI components in webpage snapshots using
 ## Project Structure
 
 ```
-models/
+Python/
 ├── config/
 │   ├── config_example.yml          # Template configuration
 │   └── config.yml                  # User configuration (create from example)
@@ -91,7 +91,37 @@ cd component-classifier-backend/models/
 pip install -r requirements.txt
 ```
 
-### 2. Prepare Dataset
+### 2. Set Python Path
+
+**Important:** Set PYTHONPATH to ensure imports work correctly.
+
+#### Windows (PowerShell)
+
+```powershell
+cd component-classifier-backend/Python/
+$env:PYTHONPATH = $PWD
+
+# Verify
+echo $env:PYTHONPATH
+```
+
+#### macOS / Linux (Bash)
+
+```bash
+cd component-classifier-backend/Python/
+export PYTHONPATH=$PWD
+
+# Verify
+echo $PYTHONPATH
+```
+
+**Expected output:** You should see the full path to your `models/` directory.
+
+> **Note:** This must be set each time you open a new terminal. To make it permanent, add the export/set command to your shell profile (`.bashrc`, `.zshrc`, or PowerShell profile).
+
+---
+
+### 3. Prepare Dataset
 
 ```bash
 mkdir -p data/raw_data/
@@ -99,7 +129,7 @@ mkdir -p data/raw_data/
 
 Download webui-70k dataset and extract into `data/raw_data/`
 
-### 3. Configure
+### 4. Configure
 
 ```bash
 cp config/config_example.yml config/config.yml
