@@ -50,7 +50,7 @@ class ResourceInitializer:
                         except Exception as e:
                             self.logger.exception(f"Failed processing file {file}: {e}")
 
-                            with open(PathUtils().get_txt_path().joinpath("failed_images.txt"), "a") as f:
+                            with open(PathUtils().get_txt_path().joinpath("failed_images.txt"), "a", encoding="utf-8") as f:
                                 f.write(f"{folder.name}\n")
         except Exception as e:
             self.logger.exception(f"Failed scanning raw data path {raw_data_path}: {e}")

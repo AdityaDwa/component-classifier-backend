@@ -53,13 +53,12 @@ class ModelTrainer:
             data=str(data_yaml_path),
             epochs=self.config["epochs"],
             imgsz=self.config["imgsz"],
-            batch=self.config["batch"],
+            batch=self.config["batch"], 
             patience=self.config["patience"],
             device=self.config["device"],
             workers=self.config["workers"],
             project=self.config["project"],
             name=self.config["name"],
-            cls=list(CLASS_WEIGHTS.values()),  # Class weights for imbalance mitigation
             verbose=True,
         )
         

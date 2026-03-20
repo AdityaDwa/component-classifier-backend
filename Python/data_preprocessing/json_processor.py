@@ -26,7 +26,7 @@ class JsonProcessor:
         self.logger.info(f"inside get_viewport_list method..........")
         viewport_list: list = []
         try:
-            with open(file_path, "r") as file:
+            with open(file_path, "r", encoding="utf-8") as file:
                 content: str = file.read()
             file_content: dict = json.loads(content)
             viewport_list: list = [key for key, value in file_content.items() if value is True]
@@ -49,7 +49,7 @@ class JsonProcessor:
         self.logger.info(f"inside read_ax_tree method..........")
         node_port_dict: dict = {}
         try:
-            with open(file_path, "r") as file:
+            with open(file_path, "r", encoding="utf-8") as file:
                 content: str = file.read()
             file_content: dict = json.loads(content)
             node_port_dict = {
@@ -107,7 +107,7 @@ class JsonProcessor:
         """
         self.logger.info(f"inside add_bb_data_to_dict method..........")
         try:
-            with open(file_path, "r") as file:
+            with open(file_path, "r", encoding="utf-8") as file:
                 content: str = file.read()
             file_content: dict = json.loads(content)
             for key in list(axtree_dict.keys()):
@@ -193,10 +193,12 @@ class JsonProcessor:
                 self.logger.warning(f"Image missing for {file_name}, skipping label creation")
                 return
 
+            PathUtils().get_label_dataset_dir()
+
             txt_file_name: str = file_name + ".txt"
             file_path: Path = PathUtils().get_label_dataset_path(txt_file_name)
             counter: int = 0
-            with open(file_path, "w") as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 for key in ax_tree_dict:
                     v = ax_tree_dict[key]
                     f.write(

@@ -22,7 +22,7 @@ class PathUtils:
         Return:
             dict: Configuration data loaded from the "config.yml" file located in the "config" directory
         """
-        with open(self.__base_path.joinpath("config", "config.yml"), "r") as file:
+        with open(self.__base_path.joinpath("config", "config.yml"), "r", encoding="utf-8") as file:
             config: dict = yaml.safe_load(file)
         return config
 

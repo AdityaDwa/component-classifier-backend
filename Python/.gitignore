@@ -17,3 +17,5 @@ checkpoints/
 runs/
 data.yaml
 config.yml
+
+*.pt

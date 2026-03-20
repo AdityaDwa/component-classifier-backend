@@ -2,12 +2,12 @@
 
 TRAINING_CONFIG = {
     "model": "yolo11s.pt",          # Pre-trained YOLO model
-    "epochs": 200,                  # Maximum training epochs
+    "epochs": 30,                  # Maximum training epochs
     "imgsz": 1024,                  # Image size (1024x1024)
-    "batch": 16,                    # Batch size (adjust based on GPU)
+    "batch": 4,                    # Batch size (adjust based on GPU)
     "patience": 50,                 # Early stopping patience
     "device": 0,                    # GPU index (0 = first GPU)
-    "workers": 8,                   # Data loading workers
+    "workers": 4,                   # Data loading workers
     "project": "checkpoints",       # Where to save runs
     "name": "train",                # Run name
 }

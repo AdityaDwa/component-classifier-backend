@@ -22,7 +22,7 @@ class YAMLGenerator:
         class_names = [name for name, _ in sorted_classes]
         
         classes_file = PathUtils().get_txt_path().joinpath("classes.txt")
-        with open(classes_file, "w") as f:
+        with open(classes_file, "w", encoding="utf-8") as f:
             for name in class_names:
                 f.write(f"{name}\n")
         
@@ -41,7 +41,7 @@ class YAMLGenerator:
         
         # Read class names from classes.txt
         classes_file = PathUtils().get_txt_path().joinpath("classes.txt")
-        with open(classes_file, "r") as f:
+        with open(classes_file, "r", encoding="utf-8") as f:
             classes = [line.strip() for line in f if line.strip()]
         
         # Create YAML structure
@@ -56,7 +56,7 @@ class YAMLGenerator:
         
         # Write YAML
         yaml_path = PathUtils().get_yaml_path()
-        with open(yaml_path, "w") as f:
+        with open(yaml_path, "w", encoding="utf-8") as f:
             yaml.dump(data_config, f, sort_keys=False)
         
         self.logger.info(f"Created data.yaml at {yaml_path}")
