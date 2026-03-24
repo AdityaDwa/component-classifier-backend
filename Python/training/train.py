@@ -7,6 +7,7 @@ from utils.logger_utils import Logger
 from utils.path_utils import PathUtils
 from training.config import TRAINING_CONFIG
 from training.yaml_generator import YAMLGenerator
+from evaluation.mid_training_callback import MidTrainingCallback
 
 
 class ModelTrainer:
@@ -17,45 +18,58 @@ class ModelTrainer:
 
     def prepare_training(self) -> Path:
         """
-        Prepares necessary files before training.
+        Prepares necessary files before training starts.
+        Calls YAMLGenerator to create data.yaml and classes.txt.
+
+        Args:
+            None
 
         Returns:
-            Path: Path to data.yaml file
+            Path: Path to the generated data.yaml file.
         """
         self.logger.info("inside prepare_training method..........")
-        
-        # Generate data.yaml
         generator = YAMLGenerator()
-        yaml_path = generator.yaml_generator_main()
-        
+        yaml_path: Path = generator.yaml_generator_main()
         self.logger.info(f"Training preparation complete. data.yaml at {yaml_path}")
         return yaml_path
 
-    def train_model(self, data_yaml_path: Path) -> dict:
+    def train_model(self, data_yaml_path: Path):
         """
-        Trains YOLOv11s model on UI components dataset.
+        Loads YOLOv11s model, registers mid-training callbacks, and starts
+        training. Callbacks are registered AFTER model is created but BEFORE
+        model.train() is called — this is the only valid window for registration.
+
+        The MidTrainingCallback is initialized with eval_interval=300 meaning
+        training losses are logged every 300 batches. At 2307 iterations per
+        epoch this gives approximately 7 log points per epoch which is enough
+        to detect mid-epoch peaks that epoch-level logging would miss.
 
         Args:
-            data_yaml_path: Path to data.yaml configuration file
+            data_yaml_path (Path): Path to data.yaml YOLO configuration file.
 
         Returns:
-            dict: Training results
+            YOLO training results object.
+
+        Raises:
+            Exception: Logs and re-raises any training errors.
         """
         self.logger.info("inside train_model method..........")
         self.logger.info(f"Training configuration: {self.config}")
-        
-        # Initialize YOLO model
-        model = YOLO(self.config["model"])
+
+        model: YOLO = YOLO(self.config["model"])
         self.logger.info(f"Loaded model: {self.config['model']}")
 
-        project_path = PathUtils().get_base_path().joinpath(self.config["project"])
-        
-        # Train with class weights for imbalance
+        callback: MidTrainingCallback = MidTrainingCallback(eval_interval=300)
+        callback.register_callbacks(model)
+        self.logger.info("Mid-training callbacks registered")
+
+        project_path: Path = PathUtils().get_base_path().joinpath(self.config["project"])
+
         results = model.train(
             data=str(data_yaml_path),
             epochs=self.config["epochs"],
             imgsz=self.config["imgsz"],
-            batch=self.config["batch"], 
+            batch=self.config["batch"],
             patience=self.config["patience"],
             device=self.config["device"],
             workers=self.config["workers"],
@@ -63,31 +77,35 @@ class ModelTrainer:
             name=self.config["name"],
             verbose=True,
         )
-        
+
         self.logger.info("Training completed successfully")
         return results
 
     def training_main(self) -> None:
         """
-        Main training orchestrator method.
+        Main orchestrator for training. Prepares config files, registers
+        mid-training callbacks, runs training, logs total elapsed time.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            Exception: Propagates any critical errors after logging.
         """
         self.logger.info("inside training_main method..........")
         start_time = datetime.now(timezone.utc)
-        
+
         try:
-            # Prepare config files
-            yaml_path = self.prepare_training()
-            
-            # Train model
+            yaml_path: Path = self.prepare_training()
             results = self.train_model(yaml_path)
-            
-            # Log results
             self.logger.info(f"Training results: {results}")
-            
         except Exception as e:
             self.logger.exception(f"Error during training: {e}")
             raise
-        
+
         end_time = datetime.now(timezone.utc)
         total_time = end_time - start_time
         self.logger.info(f"Total training time: {total_time}")
