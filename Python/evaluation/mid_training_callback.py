@@ -10,22 +10,11 @@ from constants.json_constants import label_to_id_dict
 
 class MidTrainingCallback:
     """
-    Registers two callbacks into YOLO training:
+    Registers two callbacks into YOLO training to capture sub-epoch loss
+    visibility and per-class metrics at every epoch.
 
-    Callback 1 — on_batch_end (every N iterations):
-        Fires after every training batch. Every `eval_interval` iterations,
-        writes box_loss, cls_loss, dfl_loss to iteration_losses_TIMESTAMP.csv.
-        This gives you sub-epoch loss visibility. If your model peaks at
-        iteration 1800 of epoch 3 and overfits by epoch end, you will see
-        the loss rise again in this file. YOLO's results.csv never shows this.
-
-    Callback 2 — on_epoch_end (every epoch):
-        Fires after each epoch's validation completes. Extracts per-class
-        precision, recall, F1, mAP50 for all 14 classes and appends one row
-        to epoch_per_class_metrics_TIMESTAMP.csv.
-        YOLO's results.csv only stores overall mAP. This gives you per-class
-        breakdown at every epoch so you can track if rare classes like
-        sidebar or dialog ever improve.
+    Callback 1 — on_batch_end: logs box/cls/dfl loss every N iterations.
+    Callback 2 — on_epoch_end: logs per-class precision/recall/F1/mAP50 every epoch.
     """
 
     def __init__(self, eval_interval: int = 300):
@@ -42,9 +31,7 @@ class MidTrainingCallback:
 
     def _setup_csv_files(self) -> None:
         """
-        Creates both CSV files with their headers at callback initialization
-        time (before training starts). Timestamp in filename ensures each
-        training run gets its own files and previous runs are not overwritten.
+        Creates both CSV files with headers before training starts.
 
         Args:
             None
@@ -57,9 +44,10 @@ class MidTrainingCallback:
             eval_dir: Path = PathUtils().get_base_path().joinpath("evaluation_results")
             eval_dir.mkdir(parents=True, exist_ok=True)
 
+            # Timestamp in filename ensures each training run gets its own files
             timestamp: str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
-            # --- Iteration-level loss CSV ---
+            # Iteration-level loss CSV
             self.iteration_csv_path = eval_dir.joinpath(
                 f"iteration_losses_{timestamp}.csv"
             )
@@ -70,8 +58,7 @@ class MidTrainingCallback:
                 )
             self.logger.info(f"Iteration loss CSV created at {self.iteration_csv_path}")
 
-            # --- Epoch per-class metrics CSV ---
-            # One column per class per metric: heading_precision, heading_recall, etc.
+            # Epoch per-class metrics CSV — columns: heading_precision, heading_recall, etc.
             self.epoch_csv_path = eval_dir.joinpath(
                 f"epoch_per_class_metrics_{timestamp}.csv"
             )
@@ -95,13 +82,7 @@ class MidTrainingCallback:
 
     def on_batch_end(self, trainer) -> None:
         """
-        Called by YOLO after every training batch automatically.
-        Increments the global iteration counter and on every Nth iteration
-        reads the training losses from the trainer object and appends one
-        row to iteration_losses CSV.
-
-        trainer.loss_items is a tensor with [box_loss, cls_loss, dfl_loss].
-        trainer.epoch is 0-indexed so we add 1 for human-readable output.
+        Logs training losses to CSV every N iterations. Called automatically by YOLO after every batch.
 
         Args:
             trainer: YOLO BaseTrainer instance passed automatically by YOLO.
@@ -111,6 +92,7 @@ class MidTrainingCallback:
         """
         self.global_iteration += 1
 
+        # Only write every eval_interval iterations — no performance hit otherwise
         if self.global_iteration % self.eval_interval != 0:
             return
 
@@ -123,6 +105,7 @@ class MidTrainingCallback:
             cls_loss: float = round(float(loss_items[1]), 5) if len(loss_items) > 1 else 0.0
             dfl_loss: float = round(float(loss_items[2]), 5) if len(loss_items) > 2 else 0.0
 
+            # trainer.epoch is 0-indexed, adding 1 for human-readable output
             with open(self.iteration_csv_path, "a", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow(
@@ -145,16 +128,7 @@ class MidTrainingCallback:
 
     def on_epoch_end(self, trainer) -> None:
         """
-        Called by YOLO after each epoch's validation run completes automatically.
-        Reads per-class precision and recall from trainer.validator.metrics,
-        computes F1 manually, and appends one row to epoch_per_class_metrics CSV.
-
-        F1 is computed here instead of reading from YOLO directly because
-        YOLO's internal F1 computation can differ across ultralytics versions.
-        Computing it manually as harmonic mean of P and R is always reliable.
-
-        If a class has no detections its precision and recall are 0 so F1
-        will also be 0 — this is correct behavior, not a bug.
+        Logs per-class precision, recall, F1 and mAP50 to CSV after each epoch. Called automatically by YOLO after each epoch's validation completes.
 
         Args:
             trainer: YOLO BaseTrainer instance passed automatically by YOLO.
@@ -176,6 +150,7 @@ class MidTrainingCallback:
             for i, class_name in enumerate(self.class_names):
                 p: float = float(precision[i]) if i < len(precision) else 0.0
                 r: float = float(recall[i]) if i < len(recall) else 0.0
+                # F1 computed manually — more reliable than YOLO internal across versions
                 f1: float = (2 * p * r) / (p + r + 1e-9)
                 ap: float = float(ap50[i]) if i < len(ap50) else 0.0
 
@@ -199,15 +174,16 @@ class MidTrainingCallback:
 
     def register_callbacks(self, model) -> None:
         """
-        Registers both callbacks to the YOLO model. Must be called AFTER
-        creating the YOLO model instance and BEFORE calling model.train().
-        Order matters — YOLO attaches callbacks before training loop starts.
+        Registers both callbacks to the YOLO model before training starts.
 
         Args:
             model: YOLO model instance (from ultralytics import YOLO).
 
         Returns:
             None
+
+        Raises:
+            Exception: If callback registration fails.
         """
         self.logger.info("inside register_callbacks method..........")
         try:

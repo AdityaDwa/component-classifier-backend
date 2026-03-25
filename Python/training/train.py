@@ -18,8 +18,7 @@ class ModelTrainer:
 
     def prepare_training(self) -> Path:
         """
-        Prepares necessary files before training starts.
-        Calls YAMLGenerator to create data.yaml and classes.txt.
+        Prepares necessary files before training starts by calling YAMLGenerator.
 
         Args:
             None
@@ -35,14 +34,7 @@ class ModelTrainer:
 
     def train_model(self, data_yaml_path: Path):
         """
-        Loads YOLOv11s model, registers mid-training callbacks, and starts
-        training. Callbacks are registered AFTER model is created but BEFORE
-        model.train() is called — this is the only valid window for registration.
-
-        The MidTrainingCallback is initialized with eval_interval=300 meaning
-        training losses are logged every 300 batches. At 2307 iterations per
-        epoch this gives approximately 7 log points per epoch which is enough
-        to detect mid-epoch peaks that epoch-level logging would miss.
+        Loads the YOLO model, registers mid-training callbacks, and starts training.
 
         Args:
             data_yaml_path (Path): Path to data.yaml YOLO configuration file.
@@ -59,6 +51,8 @@ class ModelTrainer:
         model: YOLO = YOLO(self.config["model"])
         self.logger.info(f"Loaded model: {self.config['model']}")
 
+        # Callbacks must be registered after model is created and before model.train() is called
+        # eval_interval=300 gives ~7 loss log points per epoch at 2307 iterations per epoch
         callback: MidTrainingCallback = MidTrainingCallback(eval_interval=300)
         callback.register_callbacks(model)
         self.logger.info("Mid-training callbacks registered")
@@ -83,8 +77,7 @@ class ModelTrainer:
 
     def training_main(self) -> None:
         """
-        Main orchestrator for training. Prepares config files, registers
-        mid-training callbacks, runs training, logs total elapsed time.
+        Main orchestrator for training. Prepares config files, runs training and logs total elapsed time.
 
         Args:
             None

@@ -2,8 +2,16 @@ txt
 logs
 data
 datasets
+split_data
+checkpoints
+runs
+evaluation_results
 *.log
 *.log.*
+
+data.yaml
+config.yml
+*.pt
 
 .idea
 .vscode
@@ -11,11 +19,3 @@ datasets
 
 __pycache__
 Pipfile.lock
-
-split_data/
-checkpoints/
-runs/
-data.yaml
-config.yml
-
-*.pt

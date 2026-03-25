@@ -2,14 +2,13 @@ import csv
 import numpy as np
 from pathlib import Path
 from datetime import datetime, timezone
- 
+
 from ultralytics import YOLO
- 
+
 from utils.logger_utils import Logger
 from utils.path_utils import PathUtils
 from constants.json_constants import label_to_id_dict
- 
- 
+
 class Evaluator:
     def __init__(self):
         log_namespace = self.__class__.__name__
@@ -17,19 +16,20 @@ class Evaluator:
         self.class_names: list = [
             name for name, _ in sorted(label_to_id_dict.items(), key=lambda x: x[1])
         ]
- 
+
     def load_model(self) -> YOLO:
         """
         Loads the best trained YOLO model from checkpoints.
- 
+
         Args:
             None
- 
+
         Returns:
             YOLO: Loaded YOLO model instance.
- 
+
         Raises:
-            Exception: If model file is not found or fails to load.
+            FileNotFoundError: If best.pt does not exist at expected path.
+            Exception: If model fails to load.
         """
         self.logger.info("inside load_model method..........")
         try:
@@ -44,20 +44,17 @@ class Evaluator:
         except Exception as e:
             self.logger.exception(f"Error loading model: {e}")
             raise
- 
+
     def run_on_test_set(self, model: YOLO):
         """
-        Runs the model on the test split and returns YOLO metrics object.
-        Uses data.yaml which already has the test split path defined.
-        plots=True tells YOLO to auto-save confusion matrix and other plots
-        to the evaluation_results folder.
- 
+        Runs the loaded model against the test split and returns the YOLO metrics object.
+
         Args:
             model (YOLO): Loaded YOLO model instance.
- 
+
         Returns:
             metrics: YOLO DetMetrics object containing all evaluation results.
- 
+
         Raises:
             Exception: If evaluation fails.
         """
@@ -66,7 +63,9 @@ class Evaluator:
             yaml_path: Path = PathUtils().get_yaml_path()
             eval_dir: Path = PathUtils().get_base_path().joinpath("evaluation_results")
             eval_dir.mkdir(parents=True, exist_ok=True)
- 
+
+            # split="test" uses the test path from data.yaml — images never seen during training
+            # plots=True auto-saves confusion matrix and PR curve to evaluation_results/test_evaluation/
             metrics = model.val(
                 data=str(yaml_path),
                 split="test",
@@ -80,17 +79,14 @@ class Evaluator:
         except Exception as e:
             self.logger.exception(f"Error running test set evaluation: {e}")
             raise
- 
+
     def extract_per_class_metrics(self, metrics) -> list:
         """
-        Extracts per-class precision, recall, F1, mAP50 and mAP50-95 from
-        the YOLO metrics object. F1 is computed manually as the harmonic mean
-        of precision and recall since it is more reliable than YOLO's internal
-        value across all ultralytics versions.
- 
+        Extracts per-class precision, recall, F1, mAP50 and mAP50-95 from the YOLO metrics object.
+
         Args:
             metrics: YOLO DetMetrics object returned by model.val().
- 
+
         Returns:
             list: List of dicts, one per class, with keys:
                   class, precision, recall, f1, mAP50, mAP50_95
@@ -102,15 +98,14 @@ class Evaluator:
             recall: np.ndarray = metrics.box.r
             ap50: np.ndarray = metrics.box.ap50
             ap: np.ndarray = metrics.box.ap
- 
+
             for i, class_name in enumerate(self.class_names):
                 p: float = float(precision[i]) if i < len(precision) else 0.0
                 r: float = float(recall[i]) if i < len(recall) else 0.0
- 
-                # F1 computed manually - harmonic mean of precision and recall
-                # Adding 1e-9 to denominator prevents division by zero
+
+                # 1e-9 added to denominator to prevent division by zero for undetected classes
                 f1: float = (2 * p * r) / (p + r + 1e-9)
- 
+
                 per_class_data.append(
                     {
                         "class": class_name,
@@ -121,23 +116,21 @@ class Evaluator:
                         "mAP50_95": round(float(ap[i]) if i < len(ap) else 0.0, 4),
                     }
                 )
- 
+
             self.logger.info(f"Per-class metrics extracted for {len(per_class_data)} classes")
         except Exception as e:
             self.logger.exception(f"Error extracting per-class metrics: {e}")
- 
+
         return per_class_data
- 
+
     def save_metrics_to_csv(self, per_class_metrics: list, metrics) -> None:
         """
-        Saves both per-class and overall metrics to timestamped CSV files
-        inside evaluation_results/. Timestamp in filename prevents overwriting
-        previous evaluation runs.
- 
+        Saves per-class and overall metrics to timestamped CSV files inside evaluation_results/.
+
         Args:
             per_class_metrics (list): List of per-class metric dicts.
             metrics: YOLO DetMetrics object for overall scores.
- 
+
         Returns:
             None
         """
@@ -145,10 +138,10 @@ class Evaluator:
         try:
             eval_dir: Path = PathUtils().get_base_path().joinpath("evaluation_results")
             eval_dir.mkdir(parents=True, exist_ok=True)
- 
+
             timestamp: str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
- 
-            # --- Per-class CSV ---
+
+            # Per-class CSV — 14 rows, one per class
             per_class_path: Path = eval_dir.joinpath(f"per_class_metrics_{timestamp}.csv")
             fieldnames: list = ["class", "precision", "recall", "f1", "mAP50", "mAP50_95"]
             with open(per_class_path, "w", newline="", encoding="utf-8") as f:
@@ -156,8 +149,8 @@ class Evaluator:
                 writer.writeheader()
                 writer.writerows(per_class_metrics)
             self.logger.info(f"Per-class metrics saved to {per_class_path}")
- 
-            # --- Overall metrics CSV ---
+
+            # Overall metrics CSV — 4 rows, averaged across all classes
             overall_path: Path = eval_dir.joinpath(f"overall_metrics_{timestamp}.csv")
             with open(overall_path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
@@ -167,19 +160,18 @@ class Evaluator:
                 writer.writerow(["precision_overall", round(float(metrics.box.mp), 4)])
                 writer.writerow(["recall_overall", round(float(metrics.box.mr), 4)])
             self.logger.info(f"Overall metrics saved to {overall_path}")
- 
+
         except Exception as e:
             self.logger.exception(f"Error saving metrics to CSV: {e}")
- 
+
     def print_summary(self, per_class_metrics: list, metrics) -> None:
         """
-        Prints a formatted summary table to the terminal showing per-class
-        and overall metrics side by side for easy reading.
- 
+        Prints a formatted per-class and overall metrics table to the terminal.
+
         Args:
             per_class_metrics (list): List of per-class metric dicts.
             metrics: YOLO DetMetrics object for overall scores.
- 
+
         Returns:
             None
         """
@@ -187,7 +179,7 @@ class Evaluator:
         try:
             separator: str = "=" * 75
             thin_separator: str = "-" * 75
- 
+
             print(f"\n{separator}")
             print("  EVALUATION RESULTS — TEST SET (never seen during training)")
             print(separator)
@@ -207,21 +199,20 @@ class Evaluator:
                     f"{row['f1']:>8.4f} {row['mAP50']:>8.4f} {row['mAP50_95']:>10.4f}"
                 )
             print(f"{separator}\n")
- 
+
         except Exception as e:
             self.logger.exception(f"Error printing summary: {e}")
- 
+
     def evaluator_main(self) -> None:
         """
-        Main orchestrator for post-training evaluation. Loads model, runs
-        on test set, extracts metrics, saves CSVs, prints summary.
- 
+        Main orchestrator for post-training evaluation on the test set.
+
         Args:
             None
- 
+
         Returns:
             None
- 
+
         Raises:
             Exception: Propagates any critical errors after logging.
         """
@@ -235,8 +226,7 @@ class Evaluator:
         except Exception as e:
             self.logger.exception(f"Error in evaluator_main: {e}")
             raise
- 
- 
+
 if __name__ == "__main__":
     evaluator = Evaluator()
     evaluator.evaluator_main()
