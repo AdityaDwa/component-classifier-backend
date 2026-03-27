@@ -20,5 +20,3 @@ config.yml
 
 __pycache__
 Pipfile.lock
-
-test_analysis.py

@@ -5,17 +5,15 @@ Implements geometric layout metrics based on component positions and spatial
 distribution. Both metrics are computed independently and combined with
 diagnostic messages for actionable feedback.
 
-CHANGES FROM PREVIOUS VERSION:
-  calculate_clutter_score():
-    - overlaps.append() now stores "component1" and "component2" as the full
-      detection dicts (not just class name / bbox). Because analyzer.py assigns
-      component_id to every detection before calling this function, those dicts
-      already carry their IDs. This lets analyzer.py link overlap issues back to
-      specific components.
-    - Return dict now includes an "overlap_pairs" key containing the full list of
-      overlap dicts. analyzer.py consumes this key (via dict.pop()) and does NOT
-      forward it to the final JSON report.
-  Everything else is unchanged.
+CHANGES IN THIS VERSION:
+  - Added semantic nesting filter in calculate_clutter_score():
+    Overlaps with IoU > 0.85 are still counted in the overlap_penalty
+    (affecting the clutter score) but are NOT added to the overlaps list
+    (so they don't appear as per-component issues).
+    
+    Rationale: IoU > 0.85 typically indicates semantic parent-child nesting
+    (e.g., sidebar inside container, nav inside header) rather than broken
+    layout. These are expected structural relationships, not layout problems.
 """
 
 import math
@@ -38,7 +36,12 @@ class LayoutAnalyzer:
 
         # Empirical constants
         self.N_MAX = 80  # Maximum components before layout is excessively populated
-        self.NEAR_OVERLAP_DISTANCE = 20  # Pixels — threshold for near-overlap penalty
+        self.NEAR_OVERLAP_DISTANCE = 20  # Pixels - threshold for near-overlap penalty
+
+        # Semantic nesting threshold
+        # Overlaps with IoU above this are considered parent-child nesting,
+        # not layout problems
+        self.SEMANTIC_NESTING_THRESHOLD = 0.85
 
         # Clutter weights (equal importance per report)
         self.CLUTTER_WEIGHTS = {
@@ -50,15 +53,15 @@ class LayoutAnalyzer:
 
         # Classification thresholds
         self.CLUTTER_THRESHOLDS = {
-            "clean": 40,      # 0–40
-            "moderate": 70,   # 40–70
-            # crowded: 70–100
+            "clean": 40,      # 0-40
+            "moderate": 70,   # 40-70
+            # crowded: 70-100
         }
 
         self.ALIGNMENT_THRESHOLDS = {
-            "poor": 0.5,        # 0–0.5
-            "acceptable": 0.75, # 0.5–0.75
-            # excellent: 0.75–1.0
+            "poor": 0.5,        # 0-0.5
+            "acceptable": 0.75, # 0.5-0.75
+            # excellent: 0.75-1.0
         }
 
     def calculate_clutter_score(
@@ -66,39 +69,45 @@ class LayoutAnalyzer:
     ) -> Dict:
         """
         Calculates clutter score as weighted combination of four sub-criteria:
-        1. Component Density  (N / N_max)
-        2. Component Area Ratio  (total bbox area / viewport area)
-        3. Spacing Variance  (consistency of whitespace distribution)
-        4. Overlap Penalty  (IoU-based detection of overlapping components)
+        1. Component Density (N/N_max)
+        2. Component Area Ratio (total area / viewport area)
+        3. Spacing Variance (consistency of whitespace distribution)
+        4. Overlap Penalty (IoU-based detection of overlapping components)
 
-        Final score is scaled to 0–100. Component-type-aware weights are applied
-        via COMPONENT_WEIGHTS so that intentional clustering (e.g. nav items) is
-        penalised less than accidental overlap (e.g. two buttons).
+        Final score scaled to 0-100 range with component-type-aware weighting.
+
+        SEMANTIC NESTING FILTER:
+          Overlaps with IoU > 0.85 are counted in the penalty score but NOT
+          reported as individual component issues. This prevents false positives
+          from parent-child nesting (e.g., sidebar in container, nav in header).
 
         Args:
-            detections (List[Dict]): Filtered detections — each dict must have
-                at minimum: class, bbox. If component_id is present (set by
-                analyzer.py before calling this), it is stored in overlap_pairs
-                so analyzer.py can link issues back to individual components.
-            viewport_width (int): Viewport width in pixels.
-            viewport_height (int): Viewport height in pixels.
+            detections (List[Dict]): Filtered detections with keys: class, bbox, component_id
+            viewport_width (int): Viewport width in pixels
+            viewport_height (int): Viewport height in pixels
 
         Returns:
-            Dict:
-                "score"          — float 0–100
-                "category"       — "clean" | "moderate" | "crowded"
-                "breakdown"      — {density, area_ratio, spacing_variance,
-                                    overlap_penalty} each in 0–1 range
-                "issues"         — List[str] viewport-region-level descriptions
-                "suggestions"    — List[str] actionable fixes
-                "overlap_pairs"  — List[Dict] internal data consumed by
-                                   analyzer.py; each entry has:
-                                     "component1" : full detection dict (with id)
-                                     "component2" : full detection dict (with id)
-                                     "component1_class", "component2_class"
-                                     "bbox1", "bbox2", "iou"
-                                   analyzer.py pops this key before building the
-                                   final JSON — it is NOT in the client response.
+            Dict: {
+                "score": float (0-100),
+                "category": str ("clean" | "moderate" | "crowded"),
+                "breakdown": {
+                    "density": float (0-1),
+                    "area_ratio": float (0-1),
+                    "spacing_variance": float (0-1),
+                    "overlap_penalty": float (0-1)
+                },
+                "overlap_pairs": [  # For analyzer.py to attach per-component issues
+                    {
+                        "component1_id": int,
+                        "component2_id": int,
+                        "component1_class": str,
+                        "component2_class": str,
+                        "iou": float
+                    }
+                ],
+                "issues": List[str],
+                "suggestions": List[str]
+            }
         """
         self.logger.info("inside calculate_clutter_score method..........")
 
@@ -116,12 +125,10 @@ class LayoutAnalyzer:
             # D = N / N_max
             # ------------------------------------------------------------------
             density = N / self.N_MAX if self.N_MAX > 0 else 0.0
-            density = min(density, 1.0)
+            density = min(density, 1.0)  # Cap at 1.0
 
             if N > 60:
-                issues.append(
-                    f"High component density ({N} components, threshold {self.N_MAX})"
-                )
+                issues.append(f"High component density ({N} components, threshold {self.N_MAX})")
                 suggestions.append(
                     "Consider consolidating related elements or using tabs/accordions"
                 )
@@ -140,13 +147,15 @@ class LayoutAnalyzer:
 
             # ------------------------------------------------------------------
             # Sub-criterion 3: Spacing Variance
-            # σ²_normalised = σ²(nearest_neighbour_distances) / σ²_max
+            # σ²_normalized = σ²(nearest_neighbor_distances) / σ²_max
             # ------------------------------------------------------------------
             distances = self.metrics_helper.nearest_neighbor_distance(detections)
 
             if len(distances) > 1:
-                viewport_diagonal = math.sqrt(W ** 2 + H ** 2)
+                # Max variance = (viewport diagonal / 4)²
+                viewport_diagonal = math.sqrt(W**2 + H**2)
                 max_variance = (viewport_diagonal / 4) ** 2
+
                 spacing_variance = self.metrics_helper.variance_normalized(
                     distances, max_variance
                 )
@@ -155,13 +164,11 @@ class LayoutAnalyzer:
 
             # ------------------------------------------------------------------
             # Sub-criterion 4: Overlap and Near-Overlap Penalty
-            # P_normalised = (weighted overlap count) / N
+            # P_normalized = (weighted overlap count) / N
             #
-            # CHANGE: overlaps list now stores the full detection dicts for each
-            # pair (component1 / component2). This lets analyzer.py read the
-            # component_id from each dict and attach per-component issues.
+            # CRITICAL CHANGE: Semantic nesting filter applied here
             # ------------------------------------------------------------------
-            overlaps = []
+            overlaps = []  # Only overlaps with IoU < 0.85 (real layout problems)
             total_penalty = 0.0
 
             for i, det_i in enumerate(detections):
@@ -174,55 +181,57 @@ class LayoutAnalyzer:
 
                     iou = self.metrics_helper.calculate_iou(bbox_i, bbox_j)
 
+                    # Apply component-type-aware overlap penalty
                     class_i = det_i.get("class", "container")
                     class_j = det_j.get("class", "container")
-
-                    weight_i = COMPONENT_WEIGHTS.get(class_i, {}).get(
-                        "overlap_penalty", 1.0
-                    )
-                    weight_j = COMPONENT_WEIGHTS.get(class_j, {}).get(
-                        "overlap_penalty", 1.0
-                    )
+                    
+                    weight_i = COMPONENT_WEIGHTS.get(class_i, {}).get("overlap_penalty", 1.0)
+                    weight_j = COMPONENT_WEIGHTS.get(class_j, {}).get("overlap_penalty", 1.0)
                     avg_weight = (weight_i + weight_j) / 2
 
                     if iou > 0.1:
+                        # ══════════════════════════════════════════════════════
+                        # CHANGE APPLIED HERE (Lines 142-163)
+                        # ══════════════════════════════════════════════════════
+                        
+                        # Always count overlap in penalty (affects clutter score)
                         total_penalty += 1.0 * avg_weight
-                        # ── CHANGE ───────────────────────────────────────────
-                        # Store full detection dicts (component1 / component2)
-                        # in addition to the existing class/bbox fields.
-                        # analyzer.py uses det_i["component_id"] and
-                        # det_j["component_id"] to attach overlap issues back to
-                        # the correct entries in the components array.
-                        # ─────────────────────────────────────────────────────
-                        overlaps.append(
-                            {
-                                "component1": det_i,
-                                "component2": det_j,
-                                "component1_class": class_i,
-                                "component2_class": class_j,
-                                "bbox1": bbox_i,
-                                "bbox2": bbox_j,
-                                "iou": round(iou, 3),
-                            }
-                        )
+                        
+                        # SEMANTIC NESTING FILTER:
+                        # Only add to overlaps list if IoU < 0.85
+                        # High IoU (≥0.85) indicates parent-child nesting, not layout problem
+                        if iou < self.SEMANTIC_NESTING_THRESHOLD:
+                            overlaps.append(
+                                {
+                                    "component1": det_i,
+                                    "component2": det_j,
+                                    "component1_class": class_i,
+                                    "component2_class": class_j,
+                                    "bbox1": bbox_i,
+                                    "bbox2": bbox_j,
+                                    "iou": round(iou, 3),
+                                }
+                            )
+                        else:
+                            # Log semantic nesting (for debugging, not reported as issue)
+                            self.logger.debug(
+                                f"Semantic nesting detected (IoU={iou:.2f}): "
+                                f"{class_i} (#{det_i.get('component_id')}) contains "
+                                f"{class_j} (#{det_j.get('component_id')})"
+                            )
+                        
+                        # ══════════════════════════════════════════════════════
+                        # END OF CHANGE
+                        # ══════════════════════════════════════════════════════
                     else:
                         # Check near-overlap (close proximity)
-                        center_i_x = (
-                            bbox_i.get("x", 0) + bbox_i.get("width", 0) / 2
-                        )
-                        center_i_y = (
-                            bbox_i.get("y", 0) + bbox_i.get("height", 0) / 2
-                        )
-                        center_j_x = (
-                            bbox_j.get("x", 0) + bbox_j.get("width", 0) / 2
-                        )
-                        center_j_y = (
-                            bbox_j.get("y", 0) + bbox_j.get("height", 0) / 2
-                        )
+                        center_i_x = bbox_i.get("x", 0) + bbox_i.get("width", 0) / 2
+                        center_i_y = bbox_i.get("y", 0) + bbox_i.get("height", 0) / 2
+                        center_j_x = bbox_j.get("x", 0) + bbox_j.get("width", 0) / 2
+                        center_j_y = bbox_j.get("y", 0) + bbox_j.get("height", 0) / 2
 
                         distance = math.sqrt(
-                            (center_i_x - center_j_x) ** 2
-                            + (center_i_y - center_j_y) ** 2
+                            (center_i_x - center_j_x) ** 2 + (center_i_y - center_j_y) ** 2
                         )
 
                         if distance < self.NEAR_OVERLAP_DISTANCE:
@@ -231,21 +240,23 @@ class LayoutAnalyzer:
             overlap_penalty = total_penalty / N if N > 0 else 0.0
             overlap_penalty = min(overlap_penalty, 1.0)
 
-            # Generate overlap diagnostics (viewport-region level for aggregate)
+            # Generate overlap diagnostics (only for real layout problems, IoU < 0.85)
             if overlaps:
-                overlap_regions = self._group_overlaps_by_region(overlaps, W, H)
+                overlap_regions = self._group_overlaps_by_region(
+                    overlaps, W, H
+                )
                 for region, region_overlaps in overlap_regions.items():
                     count = len(region_overlaps)
                     issues.append(
                         f"{count} component overlap{'s' if count > 1 else ''} "
                         f"detected in {region.replace('-', ' ')} region"
                     )
+
+                    # List specific overlapping components (max 2 per region)
                     for overlap in region_overlaps[:2]:
                         suggestions.append(
-                            f"Separate overlapping "
-                            f"'{overlap['component1_class']}' and "
-                            f"'{overlap['component2_class']}' components in "
-                            f"{region.replace('-', ' ')}"
+                            f"Separate overlapping '{overlap['component1_class']}' and "
+                            f"'{overlap['component2_class']}' components in {region.replace('-', ' ')}"
                         )
 
             # ------------------------------------------------------------------
@@ -259,6 +270,7 @@ class LayoutAnalyzer:
                 + self.CLUTTER_WEIGHTS["overlap_penalty"] * overlap_penalty
             )
 
+            # Classify
             if clutter_score < self.CLUTTER_THRESHOLDS["clean"]:
                 category = "clean"
             elif clutter_score < self.CLUTTER_THRESHOLDS["moderate"]:
@@ -267,17 +279,10 @@ class LayoutAnalyzer:
                 category = "crowded"
 
             self.logger.info(
-                f"Clutter score: {clutter_score:.2f} ({category}) — "
-                f"D={density:.3f}, A={area_ratio:.3f}, "
-                f"S={spacing_variance:.3f}, P={overlap_penalty:.3f}"
+                f"Clutter score: {clutter_score:.2f} ({category}) - "
+                f"D={density:.3f}, A={area_ratio:.3f}, S={spacing_variance:.3f}, P={overlap_penalty:.3f}"
             )
 
-            # ── CHANGE ────────────────────────────────────────────────────────
-            # "overlap_pairs" is added to the return dict.
-            # analyzer.py calls clutter_result.pop("overlap_pairs", []) to
-            # consume this list and attach per-component issues. The key is
-            # therefore absent from the final client-facing JSON.
-            # ─────────────────────────────────────────────────────────────────
             return {
                 "score": round(clutter_score, 2),
                 "category": category,
@@ -287,9 +292,9 @@ class LayoutAnalyzer:
                     "spacing_variance": round(spacing_variance, 3),
                     "overlap_penalty": round(overlap_penalty, 3),
                 },
+                "overlap_pairs": overlaps,  # For analyzer.py to attach per-component issues
                 "issues": issues,
                 "suggestions": suggestions,
-                "overlap_pairs": overlaps,  # consumed + popped by analyzer.py
             }
 
         except Exception as e:
@@ -298,9 +303,9 @@ class LayoutAnalyzer:
                 "score": 0.0,
                 "category": "error",
                 "breakdown": {},
+                "overlap_pairs": [],
                 "issues": [f"Calculation error: {str(e)}"],
                 "suggestions": [],
-                "overlap_pairs": [],
             }
 
     def _group_overlaps_by_region(
@@ -310,12 +315,12 @@ class LayoutAnalyzer:
         Groups overlapping component pairs by viewport region for spatial diagnostics.
 
         Args:
-            overlaps (List[Dict]): List of overlap dicts with bbox1, bbox2.
-            W (int): Viewport width.
-            H (int): Viewport height.
+            overlaps (List[Dict]): List of overlap dicts with bbox1, bbox2
+            W (int): Viewport width
+            H (int): Viewport height
 
         Returns:
-            Dict[str, List[Dict]]: Overlaps grouped by region name.
+            Dict[str, List[Dict]]: Overlaps grouped by region name
         """
         regions = {}
 
@@ -323,14 +328,15 @@ class LayoutAnalyzer:
             bbox1 = overlap["bbox1"]
             bbox2 = overlap["bbox2"]
 
+            # Center point of overlap (midpoint between two bbox centers)
             center_x = (
-                bbox1.get("x", 0) + bbox1.get("width", 0) / 2
-                + bbox2.get("x", 0) + bbox2.get("width", 0) / 2
+                bbox1.get("x", 0) + bbox1.get("width", 0) / 2 +
+                bbox2.get("x", 0) + bbox2.get("width", 0) / 2
             ) / 2
 
             center_y = (
-                bbox1.get("y", 0) + bbox1.get("height", 0) / 2
-                + bbox2.get("y", 0) + bbox2.get("height", 0) / 2
+                bbox1.get("y", 0) + bbox1.get("height", 0) / 2 +
+                bbox2.get("y", 0) + bbox2.get("height", 0) / 2
             ) / 2
 
             region = self.metrics_helper.get_region_name(center_x, center_y, W, H)
@@ -346,25 +352,30 @@ class LayoutAnalyzer:
     ) -> Dict:
         """
         Calculates alignment consistency as the average of three sub-criteria:
-        1. Left Edge Alignment  (variance of left positions)
-        2. Center Alignment     (variance of horizontal centers)
-        3. Baseline Alignment   (variance of bottom edge positions)
+        1. Left Edge Alignment (variance of left positions)
+        2. Center Alignment (variance of horizontal centers)
+        3. Baseline Alignment (variance of bottom edge positions)
 
-        Each variance is normalised and subtracted from 1.0 so that lower variance
+        Each variance is normalized and subtracted from 1.0 so that lower variance
         (better alignment) yields higher scores.
 
         Args:
-            detections (List[Dict]): Filtered detections with keys: class, bbox.
-            viewport_width (int): Viewport width in pixels.
-            viewport_height (int): Viewport height in pixels.
+            detections (List[Dict]): Filtered detections with keys: class, bbox, component_id
+            viewport_width (int): Viewport width in pixels
+            viewport_height (int): Viewport height in pixels
 
         Returns:
-            Dict:
-                "score"      — float 0–1
-                "category"   — "poor" | "acceptable" | "excellent"
-                "breakdown"  — {left_edge, center, baseline} each 0–1
-                "issues"     — List[str]
-                "suggestions"— List[str]
+            Dict: {
+                "score": float (0-1),
+                "category": str ("poor" | "acceptable" | "excellent"),
+                "breakdown": {
+                    "left_edge": float (0-1),
+                    "center": float (0-1),
+                    "baseline": float (0-1)
+                },
+                "issues": List[str],
+                "suggestions": List[str]
+            }
         """
         self.logger.info("inside calculate_alignment_score method..........")
 
@@ -374,7 +385,7 @@ class LayoutAnalyzer:
         suggestions = []
 
         if len(detections) < 2:
-            self.logger.warning("Fewer than 2 components — alignment score set to 1.0")
+            self.logger.warning("Fewer than 2 components, alignment score set to 1.0")
             return {
                 "score": 1.0,
                 "category": "excellent",
@@ -392,11 +403,14 @@ class LayoutAnalyzer:
             for det in detections:
                 bbox = det.get("bbox", {})
                 class_name = det.get("class", "container")
-                weight = COMPONENT_WEIGHTS.get(class_name, {}).get(
-                    "alignment_weight", 1.0
-                )
+                
+                # Apply component-type-aware weight
+                weight = COMPONENT_WEIGHTS.get(class_name, {}).get("alignment_weight", 1.0)
+                
+                # Weight influences how much this component affects variance
+                # Higher weight = component's misalignment penalized more
                 left_pos = bbox.get("x", 0)
-                left_positions.extend([left_pos] * int(weight * 10))
+                left_positions.extend([left_pos] * int(weight * 10))  # Repeat based on weight
 
             max_variance_left = (W / 2) ** 2
             variance_left = self.metrics_helper.variance_normalized(
@@ -412,9 +426,8 @@ class LayoutAnalyzer:
             for det in detections:
                 bbox = det.get("bbox", {})
                 class_name = det.get("class", "container")
-                weight = COMPONENT_WEIGHTS.get(class_name, {}).get(
-                    "alignment_weight", 1.0
-                )
+                weight = COMPONENT_WEIGHTS.get(class_name, {}).get("alignment_weight", 1.0)
+                
                 center_pos = bbox.get("x", 0) + bbox.get("width", 0) / 2
                 center_positions.extend([center_pos] * int(weight * 10))
 
@@ -432,9 +445,8 @@ class LayoutAnalyzer:
             for det in detections:
                 bbox = det.get("bbox", {})
                 class_name = det.get("class", "container")
-                weight = COMPONENT_WEIGHTS.get(class_name, {}).get(
-                    "alignment_weight", 1.0
-                )
+                weight = COMPONENT_WEIGHTS.get(class_name, {}).get("alignment_weight", 1.0)
+                
                 baseline_pos = bbox.get("y", 0) + bbox.get("height", 0)
                 baseline_positions.extend([baseline_pos] * int(weight * 10))
 
@@ -448,28 +460,22 @@ class LayoutAnalyzer:
             # Final Alignment Score
             # Alignment = (A_L + A_C + A_B) / 3
             # ------------------------------------------------------------------
-            alignment_score = (
-                alignment_left + alignment_center + alignment_baseline
-            ) / 3
+            alignment_score = (alignment_left + alignment_center + alignment_baseline) / 3
 
+            # Generate diagnostics
             if alignment_baseline < self.ALIGNMENT_THRESHOLDS["acceptable"]:
                 issues.append(
-                    f"Baseline alignment below threshold "
-                    f"({alignment_baseline:.2f} < 0.75)"
+                    f"Baseline alignment below threshold ({alignment_baseline:.2f} < 0.75)"
                 )
-                suggestions.append(
-                    "Align bottom edges of components on the same row"
-                )
+                suggestions.append("Align bottom edges of components on the same row")
 
             if alignment_left < self.ALIGNMENT_THRESHOLDS["acceptable"]:
                 issues.append(
-                    f"Left edge alignment inconsistent "
-                    f"({alignment_left:.2f} < 0.75)"
+                    f"Left edge alignment inconsistent ({alignment_left:.2f} < 0.75)"
                 )
-                suggestions.append(
-                    "Align left edges to a consistent grid column"
-                )
+                suggestions.append("Align left edges to a consistent grid column")
 
+            # Classify
             if alignment_score < self.ALIGNMENT_THRESHOLDS["poor"]:
                 category = "poor"
             elif alignment_score < self.ALIGNMENT_THRESHOLDS["acceptable"]:
@@ -478,9 +484,8 @@ class LayoutAnalyzer:
                 category = "excellent"
 
             self.logger.info(
-                f"Alignment score: {alignment_score:.3f} ({category}) — "
-                f"Left={alignment_left:.3f}, Center={alignment_center:.3f}, "
-                f"Baseline={alignment_baseline:.3f}"
+                f"Alignment score: {alignment_score:.3f} ({category}) - "
+                f"Left={alignment_left:.3f}, Center={alignment_center:.3f}, Baseline={alignment_baseline:.3f}"
             )
 
             return {
