@@ -70,6 +70,8 @@ class ModelTrainer:
             project=str(project_path),
             name=self.config["name"],
             verbose=True,
+            # amp=True,
+            # resume=True,
         )
 
         self.logger.info("Training completed successfully")

@@ -6,6 +6,7 @@ split_data
 checkpoints
 runs
 evaluation_results
+analysis_results
 *.log
 *.log.*
 
@@ -19,3 +20,5 @@ config.yml
 
 __pycache__
 Pipfile.lock
+
+test_analysis.py

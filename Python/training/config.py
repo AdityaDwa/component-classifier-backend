@@ -7,7 +7,7 @@ TRAINING_CONFIG = {
     "batch": 4,                     # Batch size (adjust based on GPU)
     "patience": 50,                 # Early stopping patience
     "device": 0,                    # GPU index (0 = first GPU)
-    "workers": 4,                   # Data loading workers
+    "workers": 2,                   # Data loading workers
     "project": "checkpoints",       # Where to save runs
     "name": "train",                # Run name
 }
