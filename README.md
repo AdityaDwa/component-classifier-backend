@@ -70,6 +70,23 @@ Python/
 │       ├── epoch_map50_progression.png
 │       └── train_val_loss_comparison.png
 │
+├── analysis/
+│   ├── analyzer.py                             # Main pipeline for layout and alignment scoring
+│   ├── color_analysis.py                       # Computes color-based metrics for UI components
+│   ├── layout_analysis.py                      # Calculates geometric layout metrics like clutter and spacing
+│   ├── metrics.py                              # Helper functions for distance, IoU, variance, and region calculations
+│   └── preprocessing.py                        # Utilities to clean, filter, and prepare component data for analysis
+│
+├── analysis_results/                           # Stores generated UI analysis reports in JSON format
+│   ├── layout_report_TIMESTAMP_001.json
+│   ├── layout_report_TIMESTAMP_002.json
+│   └── ...
+│
+├── inference/
+│   ├── __init__.py                             # Marks folder as Python package for imports
+│   ├── format_converter.py                     # Converts YOLO outputs into analysis-ready component format
+│   └── predictor.py                            # Runs YOLO prediction on images and triggers full UI analysis pipeline
+│
 ├── checkpoints/
 │   └── train/
 │       ├── weights/
@@ -236,6 +253,16 @@ python evaluation\visualizer.py
 
 ---
 
+### Step 8: Run Analysis Pipeline
+
+```bash
+python inference\predictor.py [image-path]
+```
+
+**Output:** `analysis_results/layout_report_TIMESTAMP.json` with complete detection and analysis metadata.
+
+---
+
 ## GPU Configuration
 
 Edit `training/config.py` based on your GPU:
@@ -244,7 +271,7 @@ Edit `training/config.py` based on your GPU:
 
 ```python
 TRAINING_CONFIG = {
-    "batch": 10,
+    "batch": 8,
     "workers": 6,
     "device": 0,
 }
@@ -254,8 +281,8 @@ TRAINING_CONFIG = {
 
 ```python
 TRAINING_CONFIG = {
-    "batch": 4,
-    "workers": 2,
+    "batch": 2,
+    "workers": 1,
     "device": 0,
 }
 ```
