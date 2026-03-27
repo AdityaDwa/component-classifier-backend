@@ -4,16 +4,6 @@ Layout quality analysis: Clutter Score and Alignment Consistency.
 Implements geometric layout metrics based on component positions and spatial
 distribution. Both metrics are computed independently and combined with
 diagnostic messages for actionable feedback.
-
-CHANGES IN THIS VERSION:
-  - Added semantic nesting filter in calculate_clutter_score():
-    Overlaps with IoU > 0.85 are still counted in the overlap_penalty
-    (affecting the clutter score) but are NOT added to the overlaps list
-    (so they don't appear as per-component issues).
-    
-    Rationale: IoU > 0.85 typically indicates semantic parent-child nesting
-    (e.g., sidebar inside container, nav inside header) rather than broken
-    layout. These are expected structural relationships, not layout problems.
 """
 
 import math

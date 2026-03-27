@@ -70,7 +70,7 @@ class ModelTrainer:
             project=str(project_path),
             name=self.config["name"],
             verbose=True,
-            # amp=True,
+            amp=True,
             # resume=True,
         )
 

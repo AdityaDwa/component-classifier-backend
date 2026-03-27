@@ -5,31 +5,6 @@ This is the entry point for running complete UI quality analysis on a webpage.
 Coordinates preprocessing, layout analysis, and color contrast checks, then
 assembles a comprehensive report with both per-component detail and aggregate
 page-level metrics.
-
-CHANGES FROM PREVIOUS VERSION:
-  analyze_layout() — significant restructure:
-    - Assigns a sequential component_id (0, 1, 2, …) to every raw detection
-      before passing them to any downstream function. All downstream functions
-      operate on dicts that already carry their ID.
-    - Builds a components_map dict (id → component data) that is progressively
-      enriched as each analysis step runs.
-    - Consumes "overlap_pairs" returned by calculate_clutter_score() to attach
-      per-component overlap issues. The key is popped so it is absent from the
-      final JSON.
-    - Consumes "per_component_data" returned by assess_contrast_compliance() to
-      populate per-component hex colors, contrast ratio, and WCAG flag. The key
-      is popped so it is absent from the final JSON.
-    - Returns a "components" array in the final report alongside the existing
-      aggregate "clutter", "alignment", "contrast" keys.
-    - "metadata" now reports components_in_layout_analysis and
-      components_in_color_analysis instead of the old components_analyzed /
-      text_components_analyzed field names.
-
-  if __name__ == "__main__" test block REMOVED.
-    All test code lives in test_analysis.py at the project root.
-    Running this file directly now does nothing — import it and call
-    UIAnalyzer().analyze_layout(...) from test_analysis.py or from the
-    inference module.
 """
 
 import json

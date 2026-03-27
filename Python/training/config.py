@@ -2,7 +2,7 @@
 
 TRAINING_CONFIG = {
     "model": "yolo11s.pt",          # Pre-trained YOLO model
-    "epochs": 5,                    # Maximum training epochs
+    "epochs": 750,                  # Maximum training epochs
     "imgsz": 1024,                  # Image size (1024x1024)
     "batch": 4,                     # Batch size (adjust based on GPU)
     "patience": 50,                 # Early stopping patience
@@ -13,8 +13,8 @@ TRAINING_CONFIG = {
 }
 
 SPLIT_CONFIG = {
-    "train_ratio": 0.8,    # 80% training
-    "val_ratio": 0.1,      # 10% validation
-    "test_ratio": 0.1,     # 10% test
-    "random_seed": 42,     # Reproducibility
+    "train_ratio": 0.8,
+    "val_ratio": 0.1,
+    "test_ratio": 0.1,
+    "random_seed": 11,
 }
