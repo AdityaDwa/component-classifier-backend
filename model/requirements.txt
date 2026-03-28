@@ -1,0 +1,6 @@
+pytz
+pyyaml
+ultralytics
+matplotlib
+easyocr
+scikit-learn
