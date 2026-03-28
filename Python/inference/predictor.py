@@ -220,11 +220,11 @@ def main():
     # Output result
     if args.output:
         with open(args.output, 'w', encoding='utf-8') as f:
-            json.dump(result, f, indent=2, ensure_ascii=False)
+            json.dump(result, f, indent=2, ensure_ascii=False, default=UIAnalyzer._convert_numpy)
         print(f"Results saved to {args.output}")
     else:
         # Print to stdout for backend to capture
-        print(json.dumps(result, ensure_ascii=False))
+        print(json.dumps(result, ensure_ascii=False, default=UIAnalyzer._convert_numpy))
 
 
 if __name__ == "__main__":

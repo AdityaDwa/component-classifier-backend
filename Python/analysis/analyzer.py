@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Dict
+import numpy as np
 
 from utils.logger_utils import Logger
 from utils.path_utils import PathUtils
@@ -425,6 +426,15 @@ class UIAnalyzer:
 
         return overall_grade, summary
 
+    def _convert_numpy(obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return obj
+
     def _save_report(self, report: Dict) -> None:
         """
         Saves the analysis report to a timestamped JSON file in analysis_results/.
@@ -446,7 +456,7 @@ class UIAnalyzer:
             filepath = results_dir.joinpath(filename)
 
             with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(report, f, indent=2, ensure_ascii=False)
+                json.dump(report, f, indent=2, ensure_ascii=False, default=UIAnalyzer._convert_numpy)
 
             self.logger.info(f"Report saved to {filepath}")
 
