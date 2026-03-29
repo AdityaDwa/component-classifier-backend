@@ -9,6 +9,7 @@ import { User } from "../models/user.model.js";
 import axios from "axios";
 
 const getUIImage = asyncHandler(async (req, res) => {
+  console.log("hello");
   const imageLocalPath = req.file?.path;
   const guestId = req.headers["x-guest-id"];
   console.log(imageLocalPath);
@@ -43,13 +44,18 @@ const getUIImage = asyncHandler(async (req, res) => {
     `${process.env.ML_SERVICE_URL}/evaluate`,
     { imageUrl: image.url }
   );
-  const { scores, components } = mlResponse.data;
+  const result = mlResponse.data;
   const storedImage = await Image.create({
     imageUrl: image.url,
     cloudinaryPublicId: image.public_id,
     uploadedBy: userId,
-    scores,
-    components,
+    overall_grade: result.overall_grade,
+    summary: result.summary,
+    metadata: result.metadata,
+    components: result.components,
+    clutter: result.clutter,
+    alignment: result.alignment,
+    contrast: result.contrast,
   });
   if (!storedImage) {
     throw new ApiError(500, "UI image storage unsuccessful.");
