@@ -270,6 +270,12 @@ const deleteGuestUser = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, {}, "Guest data cleaned up successfully"));
 });
+const tokenCheckForFileUpload = asyncHandler(async (req, res) => {
+  if (!req.user) {
+    throw new ApiError(401, "Access token expired.Please login again");
+  }
+  res.status(200).json({ success: true });
+});
 export {
   registerUser,
   loginUser,
@@ -278,4 +284,5 @@ export {
   editProfileDetails,
   refreshAccessToken,
   deleteGuestUser,
+  tokenCheckForFileUpload,
 };

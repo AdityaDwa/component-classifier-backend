@@ -91,7 +91,7 @@ const getSavedEvaluations = asyncHandler(async (req, res) => {
   const savedEvaluations = await Image.find({
     isSaved: true,
     uploadedBy: req.user._id,
-  });
+  }).sort({ updatedAt: -1 });
   return res
     .status(200)
     .json(
@@ -115,4 +115,4 @@ const deleteEvaluation = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, deletedImage, "Image deleted successfully."));
 });
-export { getUIImage, saveEvaluation,getSavedEvaluations ,deleteEvaluation};
+export { getUIImage, saveEvaluation, getSavedEvaluations, deleteEvaluation };
