@@ -22,6 +22,18 @@ class YOLOFormatConverter:
         log_namespace = self.__class__.__name__
         self.logger = Logger(log_namespace, f"{log_namespace}.log").get()
 
+    def coord_correction(self, input_coord: float, viewport_size: int, intercept: bool) -> float:
+        center = viewport_size / 2
+        differential_value_normalized = 1 - ((center - input_coord) / center)
+        correction_scale = differential_value_normalized * center
+        corrected_coord = correction_scale + input_coord
+
+        # if intercept:
+        #     corrected_coord = corrected_coord + 100*differential_value_normalized
+
+        return corrected_coord
+
+
     def convert(self, yolo_results) -> List[Dict]:
         """
         Converts YOLO Results object to analysis format.
@@ -73,8 +85,10 @@ class YOLOFormatConverter:
                     "class": class_name,
                     "confidence": confidence,
                     "bbox": {
-                        "x": x,
-                        "y": y,
+                        "x": self.coord_correction(x, width, True),
+                        "y": self.coord_correction(y, height, False),
+                        # "x": x,
+                        # "y": y,
                         "width": width,
                         "height": height
                     }
